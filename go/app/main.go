@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -24,6 +27,7 @@ type Response struct {
 type Item struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
+	Image    string `json:"image_name"`
 }
 
 type Items []Item
@@ -41,6 +45,34 @@ func addItem(c echo.Context) error {
 	category := c.FormValue("category")
 	c.Logger().Infof("Receive category: %s", category)
 
+	image := c.FormValue("image")
+	c.Logger().Infof("Receive image: %s", image)
+
+	// Open the image file
+	imgFile, err := c.FormFile("./"+image)
+	if err != nil {
+		return err
+	}
+	src, err := imgFile.Open()
+    if err != nil {
+        return err
+    }
+    defer src.Close()
+
+	// Create a SHA256 hash
+	hash := sha256.New()
+
+	// Write the contents of the image file to the hash
+	if _, err := io.Copy(hash, src); err != nil {
+		return err
+	}
+
+	// Get the final hash value
+	hashValue := hash.Sum(nil)
+
+	// Convert the hash value to a hexadecimal string
+	img_name := hex.EncodeToString(hashValue)+".jpg"
+
 	// Open the JSON file
 	jsonFile, err := os.ReadFile("./items.json")
 	if err != nil {
@@ -51,16 +83,14 @@ func addItem(c echo.Context) error {
 	var items Items
 	json.Unmarshal(jsonFile, &items)
 
-	// Add the new item to the slice
-	items = append(items, Item{Name: name, Category: category})
+	items = append(items, Item{Name: name, Category: category, Image: img_name})
 
 	// Encode the slice back into JSON
 	file, _ := json.MarshalIndent(items, "", " ")
 
-	// Write the JSON back to the file
 	_ = os.WriteFile("./items.json", file, 0644)
 
-	message := fmt.Sprintf("item received: %s", name)
+	message := fmt.Sprintf("item received: %s", image)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
@@ -73,11 +103,9 @@ func getItems(c echo.Context) error {
 		return err
 	}
 
-	// Decode the JSON file into a Go slice
 	var items Items
 	json.Unmarshal(jsonFile, &items)
 
-	// Return the slice
 	return c.JSON(http.StatusOK, items)
 }
 
