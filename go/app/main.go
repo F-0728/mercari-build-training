@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -41,25 +42,23 @@ func addItem(c echo.Context) error {
 	c.Logger().Infof("Receive category: %s", category)
 
 	// Open the JSON file
-    jsonFile, err := os.Open("items.json")
-    if err != nil {
-        return err
-    }
-    defer jsonFile.Close()
+	jsonFile, err := os.ReadFile("./items.json")
+	if err != nil {
+		return err
+	}
 
-    // Decode the JSON file into a Go slice
-    var items Items
-    byteValue, _ := ioutil.ReadAll(jsonFile)
-    json.Unmarshal(byteValue, &items)
+	// Decode the JSON file into a Go slice
+	var items Items
+	json.Unmarshal(jsonFile, &items)
 
-    // Add the new item to the slice
-    items = append(items, Item{Name: name, Category: category})
+	// Add the new item to the slice
+	items = append(items, Item{Name: name, Category: category})
 
-    // Encode the slice back into JSON
-    file, _ := json.MarshalIndent(items, "", " ")
+	// Encode the slice back into JSON
+	file, _ := json.MarshalIndent(items, "", " ")
 
-    // Write the JSON back to the file
-    _ = ioutil.WriteFile("items.json", file, 0644)
+	// Write the JSON back to the file
+	_ = os.WriteFile("./items.json", file, 0644)
 
 	message := fmt.Sprintf("item received: %s", name)
 	res := Response{Message: message}
@@ -68,20 +67,18 @@ func addItem(c echo.Context) error {
 }
 
 func getItems(c echo.Context) error {
-    // Open the JSON file
-    jsonFile, err := os.Open("items.json")
-    if err != nil {
-        return err
-    }
-    defer jsonFile.Close()
+	// Open the JSON file
+	jsonFile, err := os.ReadFile("./items.json")
+	if err != nil {
+		return err
+	}
 
-    // Decode the JSON file into a Go slice
-    var items Items
-    byteValue, _ := ioutil.ReadAll(jsonFile)
-    json.Unmarshal(byteValue, &items)
+	// Decode the JSON file into a Go slice
+	var items Items
+	json.Unmarshal(jsonFile, &items)
 
-    // Return the slice
-    return c.JSON(http.StatusOK, items)
+	// Return the slice
+	return c.JSON(http.StatusOK, items)
 }
 
 func getImg(c echo.Context) error {
@@ -121,7 +118,6 @@ func main() {
 	e.POST("/items", addItem)
 	e.GET("/items", getItems)
 	e.GET("/image/:imageFilename", getImg)
-
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
