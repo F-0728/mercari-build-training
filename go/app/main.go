@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,33 +44,27 @@ func addItem(c echo.Context) error {
 	category := c.FormValue("category")
 	c.Logger().Infof("Receive category: %s", category)
 
-	image := c.FormValue("image")
-	c.Logger().Infof("Receive image: %s", image)
-
-	// Open the image file
-	imgFile, err := c.FormFile("./"+image)
+	image, err := c.FormFile("image")
 	if err != nil {
-		return err
+		c.Logger().Error("Failed to receive image file")
 	}
-	src, err := imgFile.Open()
-    if err != nil {
-        return err
-    }
-    defer src.Close()
+	c.Logger().Infof("Receive image: %s", image)
 
 	// Create a SHA256 hash
 	hash := sha256.New()
 
-	// Write the contents of the image file to the hash
+	src, err := image.Open()
+	if err != nil {
+		c.Logger().Error("Failed to open image file")
+	}
+	defer src.Close()
+
 	if _, err := io.Copy(hash, src); err != nil {
-		return err
+		c.Logger().Error("Failed to hash image file")
 	}
 
-	// Get the final hash value
-	hashValue := hash.Sum(nil)
-
-	// Convert the hash value to a hexadecimal string
-	img_name := hex.EncodeToString(hashValue)+".jpg"
+	src.Seek(0, 0)
+	img_name := fmt.Sprintf("%x", hash.Sum(nil)) + ".jpg"
 
 	// Open the JSON file
 	jsonFile, err := os.ReadFile("./items.json")
@@ -90,7 +83,7 @@ func addItem(c echo.Context) error {
 
 	_ = os.WriteFile("./items.json", file, 0644)
 
-	message := fmt.Sprintf("item received: %s", image)
+	message := fmt.Sprintf("item received: %s", img_name)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
