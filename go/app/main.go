@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -24,6 +25,7 @@ type Response struct {
 }
 
 type Item struct {
+	ID 	     int    `json:"id"`
 	Name     string `json:"name"`
 	Category string `json:"category"`
 	Image    string `json:"image_name"`
@@ -38,6 +40,9 @@ func root(c echo.Context) error {
 
 func addItem(c echo.Context) error {
 	// Get form data
+    id := c.FormValue("id")
+    c.Logger().Infof("Receive id: %s", id)
+
 	name := c.FormValue("name")
 	c.Logger().Infof("Receive item: %s", name)
 
@@ -76,7 +81,13 @@ func addItem(c echo.Context) error {
 	var items Items
 	json.Unmarshal(jsonFile, &items)
 
-	items = append(items, Item{Name: name, Category: category, Image: img_name})
+	// Convert id from string to int
+	idInt, err := strconv.Atoi(id)
+	if err != nil {
+		return err
+	}
+
+	items = append(items, Item{ID: idInt, Name: name, Category: category, Image: img_name})
 
 	// Encode the slice back into JSON
 	file, _ := json.MarshalIndent(items, "", " ")
@@ -100,6 +111,27 @@ func getItems(c echo.Context) error {
 	json.Unmarshal(jsonFile, &items)
 
 	return c.JSON(http.StatusOK, items)
+}
+
+func getOneItem(c echo.Context) error {
+	// Open the JSON file
+	jsonFile, err := os.ReadFile("./items.json")
+	if err != nil {
+		return err
+	}
+
+	var items Items
+	json.Unmarshal(jsonFile, &items)
+
+	id := c.Param("id")
+	for _, item := range items {
+		if fmt.Sprintf("%d", item.ID) == id {
+			return c.JSON(http.StatusOK, item)
+		}
+	}
+
+	res := Response{Message: "Item not found"}
+	return c.JSON(http.StatusNotFound, res)
 }
 
 func getImg(c echo.Context) error {
@@ -138,6 +170,7 @@ func main() {
 	e.GET("/", root)
 	e.POST("/items", addItem)
 	e.GET("/items", getItems)
+	e.GET("/items/:id", getOneItem)
 	e.GET("/image/:imageFilename", getImg)
 
 	// Start server
