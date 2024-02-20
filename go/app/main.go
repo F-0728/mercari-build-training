@@ -25,7 +25,7 @@ type Response struct {
 }
 
 type Item struct {
-	ID 	     int    `json:"id"`
+	ID       int    `json:"id"`
 	Name     string `json:"name"`
 	Category string `json:"category"`
 	Image    string `json:"image_name"`
@@ -40,8 +40,8 @@ func root(c echo.Context) error {
 
 func addItem(c echo.Context) error {
 	// Get form data
-    id := c.FormValue("id")
-    c.Logger().Infof("Receive id: %s", id)
+	id := c.FormValue("id")
+	c.Logger().Infof("Receive id: %s", id)
 
 	name := c.FormValue("name")
 	c.Logger().Infof("Receive item: %s", name)
@@ -70,6 +70,13 @@ func addItem(c echo.Context) error {
 
 	src.Seek(0, 0)
 	img_name := fmt.Sprintf("%x", hash.Sum(nil)) + ".jpg"
+
+	// Save the hashed image as a file
+	dst, err := os.Create(path.Join(ImgDir, img_name))
+	if err != nil {
+		c.Logger().Error("Failed to create image file")
+	}
+	defer dst.Close()
 
 	// Open the JSON file
 	jsonFile, err := os.ReadFile("./items.json")
@@ -113,7 +120,7 @@ func getItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
-func getOneItem(c echo.Context) error {
+func getItem(c echo.Context) error {
 	// Open the JSON file
 	jsonFile, err := os.ReadFile("./items.json")
 	if err != nil {
@@ -172,7 +179,7 @@ func main() {
 	e.GET("/", root)
 	e.POST("/items", addItem)
 	e.GET("/items", getItems)
-	e.GET("/items/:id", getOneItem)
+	e.GET("/items/:id", getItem)
 	e.GET("/image/:imageFilename", getImg)
 
 	// Start server
