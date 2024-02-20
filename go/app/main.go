@@ -76,6 +76,11 @@ func addItem(c echo.Context) error {
 	if err != nil {
 		c.Logger().Error("Failed to create image file")
 	}
+
+	if _, err := io.Copy(dst, src); err != nil {
+		c.Logger().Error("Failed to save image file")
+	}
+
 	defer dst.Close()
 
 	// Open the JSON file
