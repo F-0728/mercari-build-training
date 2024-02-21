@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -20,6 +24,15 @@ type Response struct {
 	Message string `json:"message"`
 }
 
+type Item struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Category string `json:"category"`
+	Image    string `json:"image_name"`
+}
+
+type Items []Item
+
 func root(c echo.Context) error {
 	res := Response{Message: "Hello, world!"}
 	return c.JSON(http.StatusOK, res)
@@ -27,13 +40,110 @@ func root(c echo.Context) error {
 
 func addItem(c echo.Context) error {
 	// Get form data
+	id := c.FormValue("id")
+	c.Logger().Infof("Receive id: %s", id)
+
 	name := c.FormValue("name")
 	c.Logger().Infof("Receive item: %s", name)
 
-	message := fmt.Sprintf("item received: %s", name)
+	category := c.FormValue("category")
+	c.Logger().Infof("Receive category: %s", category)
+
+	image, err := c.FormFile("image")
+	if err != nil {
+		c.Logger().Error("Failed to receive image file")
+	}
+	c.Logger().Infof("Receive image: %s", image)
+
+	// Create a SHA256 hash
+	hash := sha256.New()
+
+	src, err := image.Open()
+	if err != nil {
+		c.Logger().Error("Failed to open image file")
+	}
+	defer src.Close()
+
+	if _, err := io.Copy(hash, src); err != nil {
+		c.Logger().Error("Failed to hash image file")
+	}
+
+	src.Seek(0, 0)
+	img_name := fmt.Sprintf("%x", hash.Sum(nil)) + ".jpg"
+
+	// Save the hashed image as a file
+	dst, err := os.Create(path.Join(ImgDir, img_name))
+	if err != nil {
+		c.Logger().Error("Failed to create image file")
+	}
+
+	if _, err := io.Copy(dst, src); err != nil {
+		c.Logger().Error("Failed to save image file")
+	}
+
+	defer dst.Close()
+
+	// Open the JSON file
+	jsonFile, err := os.ReadFile("./items.json")
+	if err != nil {
+		return err
+	}
+
+	// Decode the JSON file into a Go slice
+	var items Items
+	json.Unmarshal(jsonFile, &items)
+
+	// Convert id from string to int
+	idInt, err := strconv.Atoi(id)
+	if err != nil {
+		return err
+	}
+
+	items = append(items, Item{ID: idInt, Name: name, Category: category, Image: img_name})
+
+	// Encode the slice back into JSON
+	file, _ := json.MarshalIndent(items, "", " ")
+
+	_ = os.WriteFile("./items.json", file, 0644)
+
+	message := fmt.Sprintf("item received: %s", img_name)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
+}
+
+func getItems(c echo.Context) error {
+	// Open the JSON file
+	jsonFile, err := os.ReadFile("./items.json")
+	if err != nil {
+		return err
+	}
+
+	var items Items
+	json.Unmarshal(jsonFile, &items)
+
+	return c.JSON(http.StatusOK, items)
+}
+
+func getItem(c echo.Context) error {
+	// Open the JSON file
+	jsonFile, err := os.ReadFile("./items.json")
+	if err != nil {
+		return err
+	}
+
+	var items Items
+	json.Unmarshal(jsonFile, &items)
+
+	id := c.Param("id")
+	for _, item := range items {
+		if fmt.Sprintf("%d", item.ID) == id {
+			return c.JSON(http.StatusOK, item)
+		}
+	}
+
+	res := Response{Message: "Item not found"}
+	return c.JSON(http.StatusNotFound, res)
 }
 
 func getImg(c echo.Context) error {
@@ -57,7 +167,9 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Logger.SetLevel(log.INFO)
+
+	// 3-6: Set Log Level
+	e.Logger.SetLevel(log.DEBUG)
 
 	frontURL := os.Getenv("FRONT_URL")
 	if frontURL == "" {
@@ -71,8 +183,9 @@ func main() {
 	// Routes
 	e.GET("/", root)
 	e.POST("/items", addItem)
+	e.GET("/items", getItems)
+	e.GET("/items/:id", getItem)
 	e.GET("/image/:imageFilename", getImg)
-
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
