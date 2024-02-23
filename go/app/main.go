@@ -188,6 +188,35 @@ func getImg(c echo.Context) error {
 	return c.File(imgPath)
 }
 
+func searchItems(c echo.Context) error {
+	// connect DB
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Query the database
+	keyword := c.FormValue("keyword")
+	rows, err := db.Query("SELECT name, category, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	items := Items{Items: []*Item{}}
+	for rows.Next() {
+		var item Item
+		err := rows.Scan(&item.Name, &item.Category, &item.Image)
+		if err != nil {
+			return err
+		}
+		items.Items = append(items.Items, &item)
+	}
+
+	return c.JSON(http.StatusOK, items)
+}
+
 func main() {
 	e := echo.New()
 
@@ -213,6 +242,7 @@ func main() {
 	e.GET("/items", getItems)
 	e.GET("/items/:id", getItem)
 	e.GET("/image/:imageFilename", getImg)
+	e.GET("/search", searchItems)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
