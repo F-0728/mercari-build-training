@@ -1,0 +1,11 @@
+CREATE TABLE category (
+id INT PRIMARY KEY,
+name TEXT
+);
+CREATE TABLE items (
+id INT PRIMARY KEY,
+name TEXT,
+category_id INT,
+image_name TEXT,
+FOREIGN KEY (category_id) REFERENCES category(id)
+);
