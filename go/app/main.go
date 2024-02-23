@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
-	"encoding/json"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,10 +14,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
 	ImgDir = "images"
+	dbPath = "../db/mercari.sqlite3"
 )
 
 type Response struct {
@@ -31,7 +33,9 @@ type Item struct {
 	Image    string `json:"image_name"`
 }
 
-type Items []Item
+type Items struct {
+	Items []*Item `json:"items"`
+}
 
 func root(c echo.Context) error {
 	res := Response{Message: "Hello, world!"}
@@ -76,68 +80,91 @@ func addItem(c echo.Context) error {
 	if err != nil {
 		c.Logger().Error("Failed to create image file")
 	}
-
 	if _, err := io.Copy(dst, src); err != nil {
 		c.Logger().Error("Failed to save image file")
 	}
-
 	defer dst.Close()
 
-	// Open the JSON file
-	jsonFile, err := os.ReadFile("./items.json")
+	// connect to the database
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// TODO: UNDERSTAND THE SYNTAX HERE!!!!
+	stmt, err := db.Prepare("INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(name, category, img_name)
 	if err != nil {
 		return err
 	}
 
-	// Decode the JSON file into a Go slice
-	var items Items
-	json.Unmarshal(jsonFile, &items)
-
-	// Convert id from string to int
-	idInt, err := strconv.Atoi(id)
-	if err != nil {
-		return err
-	}
-
-	items = append(items, Item{ID: idInt, Name: name, Category: category, Image: img_name})
-
-	// Encode the slice back into JSON
-	file, _ := json.MarshalIndent(items, "", " ")
-
-	_ = os.WriteFile("./items.json", file, 0644)
-
-	message := fmt.Sprintf("item received: %s", img_name)
+	message := fmt.Sprintf("item received: %s", name)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
 }
 
 func getItems(c echo.Context) error {
-	// Open the JSON file
-	jsonFile, err := os.ReadFile("./items.json")
+	// connect DB
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
-	var items Items
-	json.Unmarshal(jsonFile, &items)
+	// Query the database
+	rows, err := db.Query("SELECT name, category, image_name FROM items")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
 
+	// TODO: UNDERSTAND THE SYNTAX HERE!!!!
+	items := Items{Items: []*Item{}}
+	for rows.Next() {
+		var item Item
+		err := rows.Scan(&item.Name, &item.Category, &item.Image)
+		if err != nil {
+			return err
+		}
+		items.Items = append(items.Items, &item)
+	}
 	return c.JSON(http.StatusOK, items)
 }
 
 func getItem(c echo.Context) error {
-	// Open the JSON file
-	jsonFile, err := os.ReadFile("./items.json")
+	// connect DB
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
-	var items Items
-	json.Unmarshal(jsonFile, &items)
+	// Query the database
+	rows, err := db.Query("SELECT name, category, image_name FROM items")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
 
 	id := c.Param("id")
-	for _, item := range items {
-		if fmt.Sprintf("%d", item.ID) == id {
+	// TODO: UNDERSTAND THE SYNTAX HERE!!!!
+	for rows.Next() {
+		var item Item
+		err := rows.Scan(&item.Name, &item.Category, &item.Image)
+		if err != nil {
+			return err
+		}
+		intID, err := strconv.Atoi(id)
+		if err != nil {
+			return err
+		}
+		if item.ID == intID-1 {
 			return c.JSON(http.StatusOK, item)
 		}
 	}
