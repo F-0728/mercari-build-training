@@ -1,4 +1,4 @@
-CREATE TABLE category (
+CREATE TABLE categories (
 id INT PRIMARY KEY,
 name TEXT
 );
@@ -7,5 +7,5 @@ id INT PRIMARY KEY,
 name TEXT,
 category_id INT,
 image_name TEXT,
-FOREIGN KEY (category_id) REFERENCES category(id)
+FOREIGN KEY (category_id) REFERENCES categories(id)
 );

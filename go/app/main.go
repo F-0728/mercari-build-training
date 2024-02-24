@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -118,7 +117,7 @@ func getItems(c echo.Context) error {
 	defer db.Close()
 
 	// Query the database
-	rows, err := db.Query("SELECT i.name, c.id, i.image_name FROM items i JOIN category c ON i.category_id = c.id")
+	rows, err := db.Query("SELECT i.name, c.id, i.image_name FROM items i JOIN categories c ON i.category_id = c.id")
 	if err != nil {
 		return err
 	}
@@ -138,6 +137,8 @@ func getItems(c echo.Context) error {
 }
 
 func getItem(c echo.Context) error {
+	var item Item
+
 	// connect DB
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -145,28 +146,21 @@ func getItem(c echo.Context) error {
 	}
 	defer db.Close()
 
+	id := c.Param("id")
 	// Query the database
-	rows, err := db.Query("SELECT name, category_id, image_name FROM items")
+	row, err := db.Query("SELECT name, category_id, image_name FROM items WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer row.Close()
 
-	id := c.Param("id")
 	// TODO: UNDERSTAND THE SYNTAX HERE!!!!
-	for rows.Next() {
-		var item Item
-		err := rows.Scan(&item.Name, &item.Category, &item.Image)
+	if row != nil {
+		err := row.Scan(&item.Name, &item.Category, &item.Image)
 		if err != nil {
 			return err
 		}
-		intID, err := strconv.Atoi(id)
-		if err != nil {
-			return err
-		}
-		if item.ID == intID-1 {
-			return c.JSON(http.StatusOK, item)
-		}
+		return c.JSON(http.StatusOK, item)
 	}
 
 	res := Response{Message: "Item not found"}
