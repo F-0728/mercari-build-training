@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	ImgDir = "images"
-	dbPath = "../db/mercari.sqlite3"
+	ImgDir       = "images"
+	dbPath       = "../../db/mercari.sqlite3"
+	dbSchemaPath = "../../db/items.db"
 )
 
 type Response struct {
@@ -34,6 +35,24 @@ type Item struct {
 
 type Items struct {
 	Items []*Item `json:"items"`
+}
+
+// Borrowed from https://github.com/hono-mame/mercari-build-training-2024/pull/8
+func connectDB(DBPath string) (*sql.DB, error) {
+	// Open the database
+	db, err := sql.Open("sqlite3", DBPath)
+	if err != nil {
+		return nil, err
+	}
+	// Create table if not exists
+	result, err := os.ReadFile(dbSchemaPath)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(string(result)); err != nil {
+		return nil, fmt.Errorf("failed to create table: %v", err)
+	}
+	return db, nil
 }
 
 func root(c echo.Context) error {
@@ -85,7 +104,7 @@ func addItem(c echo.Context) error {
 	defer dst.Close()
 
 	// connect to the database
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := connectDB(dbPath)
 	if err != nil {
 		return err
 	}
@@ -110,7 +129,7 @@ func addItem(c echo.Context) error {
 
 func getItems(c echo.Context) error {
 	// connect DB
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := connectDB(dbPath)
 	if err != nil {
 		return err
 	}
@@ -140,7 +159,7 @@ func getItem(c echo.Context) error {
 	var item Item
 
 	// connect DB
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := connectDB(dbPath)
 	if err != nil {
 		return err
 	}
@@ -184,7 +203,7 @@ func getImg(c echo.Context) error {
 
 func searchItems(c echo.Context) error {
 	// connect DB
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := connectDB(dbPath)
 	if err != nil {
 		return err
 	}
