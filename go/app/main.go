@@ -18,8 +18,8 @@ import (
 
 const (
 	ImgDir       = "images"
-	dbPath       = "../../db/mercari.sqlite3"
-	dbSchemaPath = "../../db/items.db"
+	dbPath       = "../db/mercari.sqlite3"
+	dbSchemaPath = "../db/items.db"
 )
 
 type Response struct {
