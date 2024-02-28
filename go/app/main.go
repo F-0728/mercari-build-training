@@ -92,7 +92,7 @@ func addItem(c echo.Context) error {
 	defer db.Close()
 
 	// TODO: UNDERSTAND THE SYNTAX HERE!!!!
-	stmt, err := db.Prepare("INSERT INTO items (name, category_id, image_name) VALUES (?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)")
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func getItems(c echo.Context) error {
 	defer db.Close()
 
 	// Query the database
-	rows, err := db.Query("SELECT i.name, c.id, i.image_name FROM items i JOIN categories c ON i.category_id = c.id")
+	rows, err := db.Query("SELECT name, category, image_name FROM items")
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func getItem(c echo.Context) error {
 
 	id := c.Param("id")
 	// Query the database
-	row, err := db.Query("SELECT name, category_id, image_name FROM items WHERE id = ?", id)
+	row, err := db.Query("SELECT name, category, image_name FROM items WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func searchItems(c echo.Context) error {
 
 	// Query the database
 	keyword := c.FormValue("keyword")
-	rows, err := db.Query("SELECT name, category_id, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
+	rows, err := db.Query("SELECT name, category, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
 	if err != nil {
 		return err
 	}
